@@ -1,65 +1,52 @@
 <?php
-function getFileRowCount($filename)
+function createSitemap($judulFile, $sitemapFileName)
 {
-    $file = fopen($filename, "r");
-    $rowCount = 0;
-
-    while (!feof($file)) {
-        fgets($file);
-        $rowCount++;
+    if (!file_exists($judulFile)) {
+        die("File " . $judulFile . " tidak ditemukan.");
     }
 
-    fclose($file);
+    $fileLines = file($judulFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $jumlahBaris = count($fileLines);
 
-    return $rowCount;
-}
+    if ($jumlahBaris == 0) {
+        die("File " . $judulFile . " kosong.");
+    }
 
-// Tentukan base URL secara manual jika $_SERVER tidak tersedia
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'example.com'; // Default ke "example.com" jika tidak ditemukan
-$requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
-$fullUrl = $protocol . "://" . $host . $requestUri;
+    $sitemapFile = fopen($sitemapFileName, "w");
+    if (!$sitemapFile) {
+        die("Gagal membuat sitemap.");
+    }
 
-// Parsing URL
-$parsedUrl = parse_url($fullUrl);
-$scheme = isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] : '';
-$host = isset($parsedUrl['host']) ? $parsedUrl['host'] : '';
-$path = isset($parsedUrl['path']) ? $parsedUrl['path'] : '';
-
-// Buat base URL
-$baseUrl = $scheme . "://" . $host . $path;
-$urlAsli = str_replace("get-sitemap.php", "", $baseUrl);
-
-// Generate robots.txt
-$robotsTxt = "User-agent: *" . PHP_EOL;
-$robotsTxt .= "Allow: /" . PHP_EOL;
-$robotsTxt .= "Sitemap: " . $urlAsli . "sitemap.xml" . PHP_EOL;
-file_put_contents('robots.txt', $robotsTxt);
-
-// Proses file untuk sitemap
-$judulFile = "hajar.txt";
-
-if (file_exists($judulFile)) {
-    $jumlahBaris = getFileRowCount($judulFile);
-    $sitemapFile = fopen("sitemap.xml", "w");
     fwrite($sitemapFile, '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL);
     fwrite($sitemapFile, '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . PHP_EOL);
 
-    $fileLines = file($judulFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($fileLines as $index => $judul) {
-        $sitemapLink = $urlAsli . '?hw=' . urlencode($judul);
-        fwrite($sitemapFile, '  <url>' . PHP_EOL);
-        fwrite($sitemapFile, '    <loc>' . $sitemapLink . '</loc>' . PHP_EOL);
-        date_default_timezone_set('Asia/Jakarta');
-        $currentTime = date('Y-m-dTH:i:sP');
-        fwrite($sitemapFile, '    <lastmod>' . $currentTime . '</lastmod>' . PHP_EOL);
-        fwrite($sitemapFile, '    <changefreq>daily</changefreq>' . PHP_EOL);
-        fwrite($sitemapFile, '  </url>' . PHP_EOL);
+    date_default_timezone_set('Asia/Jakarta');
+    $currentTime = date('Y-m-d'); // Format yang valid untuk <lastmod>
+
+    foreach ($fileLines as $judul) {
+        $sitemapLink = $GLOBALS['urlAsli'] . '?hw=' . urlencode($judul);
+        fwrite($sitemapFile, "  <url>n    <loc>$sitemapLink</loc>n    <lastmod>$currentTime</lastmod>n    <changefreq>daily</changefreq>n  </url>n");
     }
+
     fwrite($sitemapFile, '</urlset>' . PHP_EOL);
     fclose($sitemapFile);
 
     echo "SITEMAP DONE CREATE!";
-} else {
-    echo "File " . $judulFile . " tidak ditemukan.";
 }
+
+// Tentukan base URL
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST'] ?? 'example.com';
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$baseUrl = "$protocol://$host" . dirname($requestUri);
+$urlAsli = rtrim($baseUrl, '/') . '/';
+
+// Buat robots.txt (hanya jika belum ada)
+$robotsPath = 'robots.txt';
+if (!file_exists($robotsPath)) {
+    $robotsTxt = "User-agent: *nAllow: /nSitemap: " . $urlAsli . "sitemap.xmln";
+    file_put_contents($robotsPath, $robotsTxt);
+}
+
+createSitemap("hajar.txt", "sitemap.xml");
+?>
